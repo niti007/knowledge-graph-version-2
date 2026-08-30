@@ -1,0 +1,30 @@
+{
+  "generated": [
+    "POL-001.pdf",
+    "POL-002.pdf",
+    "POL-003.pdf",
+    "POL-004.pdf",
+    "INC-201.md",
+    "INC-202.md",
+    "INC-203.md",
+    "INC-204.md",
+    "INC-205.md",
+    "SOP-01.md",
+    "SOP-02.md",
+    "SOP-03.md",
+    "SOP-04.md",
+    "SOP-05.md",
+    "SOP-17.md",
+    "SOP-22.md",
+    "manual_payment_service.md",
+    "manual_auth_db.md",
+    "manual_userprofile_api.md",
+    "manual_datawarehouse.md",
+    "manual_apigateway.md",
+    "FAQ.md",
+    "users.csv",
+    "products.csv",
+    "transactions.csv",
+    "doc_metadata.csv"
+  ]
+}

@@ -1,0 +1,47 @@
+user_id,name,email,team,role,active,created_date
+U0001,Priya Sharma,priya.sharma@acme.internal,Billing,Team Lead,True,2023-01-15
+U0002,Marcus Lee,marcus.lee@acme.internal,Infrastructure,Team Lead,True,2023-01-15
+U0003,Natalia Voss,natalia.voss@acme.internal,Security,Team Lead,True,2023-01-15
+U0004,Chen Wei,chen.wei@acme.internal,Data Engineering,Team Lead,True,2023-01-15
+U0005,Amara Okafor,amara.okafor@acme.internal,Customer Success,Team Lead,True,2023-01-15
+U0006,Diego Reyes,diego.reyes@acme.internal,Product,Team Lead,True,2023-01-15
+U0007,Allison Hill,allison.hill95@acme.internal,Product,Engineer,False,2021-11-24
+U0008,Brian Yang,brian.yang4@acme.internal,Billing,Engineer,True,2024-08-21
+U0009,Javier Johnson,javier.johnson65@acme.internal,Infrastructure,Engineer,True,2021-11-10
+U0010,Lance Hoffman,lance.hoffman84@acme.internal,Product,Specialist,True,2025-07-12
+U0011,Jennifer Cole,jennifer.cole76@acme.internal,Data Engineering,Manager,True,2022-05-14
+U0012,Abigail Shaffer,abigail.shaffer90@acme.internal,Infrastructure,Specialist,True,2025-12-09
+U0013,Donald Lewis,donald.lewis20@acme.internal,Security,Analyst,True,2022-11-11
+U0014,James Howard,james.howard12@acme.internal,Billing,Specialist,True,2022-12-04
+U0015,Renee Blair,renee.blair45@acme.internal,Security,Manager,True,2024-07-24
+U0016,Thomas Miller,thomas.miller59@acme.internal,Product,Engineer,False,2022-06-29
+U0017,Lisa Hensley,lisa.hensley71@acme.internal,Billing,Manager,True,2024-11-28
+U0018,Benjamin Stanley,benjamin.stanley25@acme.internal,Customer Success,Engineer,True,2022-06-18
+U0019,Dr. Sharon James,dr..james30@acme.internal,Product,Manager,True,2023-11-09
+U0020,Holly Wood,holly.wood13@acme.internal,Infrastructure,Specialist,True,2021-10-12
+U0021,Mia Sutton,mia.sutton82@acme.internal,Data Engineering,Manager,True,2020-08-09
+U0022,Carolyn Daniel,carolyn.daniel46@acme.internal,Security,Analyst,True,2021-05-22
+U0023,Devin Schaefer,devin.schaefer88@acme.internal,Product,Engineer,True,2025-11-08
+U0024,Melinda Cameron,melinda.cameron94@acme.internal,Customer Success,Analyst,True,2020-06-22
+U0025,Andrew Stewart,andrew.stewart49@acme.internal,Data Engineering,Manager,True,2022-04-11
+U0026,Thomas Bradley,thomas.bradley42@acme.internal,Product,Engineer,True,2022-09-04
+U0027,Jonathan Wilkerson,jonathan.wilkerson41@acme.internal,Billing,Specialist,True,2025-06-20
+U0028,Derek Wright,derek.wright28@acme.internal,Billing,Manager,True,2024-10-10
+U0029,Nicole Patterson,nicole.patterson64@acme.internal,Product,Specialist,False,2024-12-17
+U0030,Daniel Bright,daniel.bright34@acme.internal,Infrastructure,Analyst,True,2024-05-02
+U0031,Peter Callahan Jr.,peter.jr.72@acme.internal,Product,Manager,False,2021-05-12
+U0032,Jennifer Brown,jennifer.brown52@acme.internal,Customer Success,Manager,True,2023-03-31
+U0033,Julie King,julie.king66@acme.internal,Infrastructure,Specialist,True,2024-09-14
+U0034,Alexandra Le,alexandra.le15@acme.internal,Billing,Analyst,True,2025-10-19
+U0035,Nicole Mack,nicole.mack55@acme.internal,Product,Engineer,False,2022-11-22
+U0036,Jeffrey Chavez,jeffrey.chavez77@acme.internal,Data Engineering,Specialist,True,2022-03-29
+U0037,Pamela Romero,pamela.romero2@acme.internal,Customer Success,Engineer,True,2020-11-26
+U0038,Elizabeth Fowler,elizabeth.fowler44@acme.internal,Product,Engineer,True,2025-03-07
+U0039,James Martin,james.martin21@acme.internal,Data Engineering,Specialist,True,2024-07-05
+U0040,Linda Burns,linda.burns93@acme.internal,Product,Manager,True,2020-12-13
+U0041,Sherry Decker,sherry.decker14@acme.internal,Customer Success,Manager,True,2022-08-13
+U0042,David Bradley,david.bradley48@acme.internal,Infrastructure,Analyst,True,2020-09-01
+U0043,John Jones,john.jones42@acme.internal,Customer Success,Specialist,True,2024-07-13
+U0044,Betty Alvarez,betty.alvarez47@acme.internal,Billing,Manager,True,2024-09-04
+U0045,Joseph Obrien,joseph.obrien31@acme.internal,Billing,Engineer,True,2021-10-20
+U0046,Nicole Vaughn,nicole.vaughn63@acme.internal,Product,Engineer,True,2022-08-26

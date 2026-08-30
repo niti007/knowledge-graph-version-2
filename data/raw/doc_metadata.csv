@@ -1,0 +1,26 @@
+filename,doc_type,dept,date,author,system_refs,sop_refs
+POL-001.pdf,policy,All,2026-06-30,Legal/Compliance,,
+POL-002.pdf,policy,All,2026-06-30,Legal/Compliance,,
+POL-003.pdf,policy,All,2026-06-30,Legal/Compliance,,
+POL-004.pdf,policy,All,2026-06-30,Legal/Compliance,,
+INC-201.md,incident_report,Infrastructure,2026-01-15,Marcus Lee,"Auth-DB,UserProfile-API",SOP-01
+INC-202.md,incident_report,Data Engineering,2026-02-03,Chen Wei,"Notification-Service,Payment-Service",SOP-05
+INC-203.md,incident_report,Data Engineering,2026-02-28,Chen Wei,"ReportingPortal,DataWarehouse",SOP-02
+INC-204.md,incident_report,Billing,2026-03-12,Priya Sharma,"Payment-Service,Auth-DB",SOP-17
+INC-205.md,incident_report,Security,2026-04-07,Natalia Voss,"APIGateway,Auth-DB",SOP-22
+SOP-01.md,sop,All,2026-06-30,Ops Team,,SOP-01
+SOP-02.md,sop,All,2026-06-30,Ops Team,,SOP-02
+SOP-03.md,sop,All,2026-06-30,Ops Team,,SOP-03
+SOP-04.md,sop,All,2026-06-30,Ops Team,,SOP-04
+SOP-05.md,sop,All,2026-06-30,Ops Team,,SOP-05
+SOP-17.md,sop,All,2026-06-30,Ops Team,,SOP-17
+SOP-22.md,sop,All,2026-06-30,Ops Team,,SOP-22
+manual_payment_service.md,technical_manual,Infrastructure,2026-06-30,Marcus Lee,Payment-Service,"SOP-01,SOP-04"
+manual_auth_db.md,technical_manual,Infrastructure,2026-06-30,Marcus Lee,Auth-Db,"SOP-01,SOP-04"
+manual_userprofile_api.md,technical_manual,Infrastructure,2026-06-30,Marcus Lee,Userprofile-Api,"SOP-01,SOP-04"
+manual_datawarehouse.md,technical_manual,Infrastructure,2026-06-30,Marcus Lee,Datawarehouse,"SOP-01,SOP-04"
+manual_apigateway.md,technical_manual,Infrastructure,2026-06-30,Marcus Lee,Apigateway,"SOP-01,SOP-04"
+FAQ.md,general,All,2026-06-30,Knowledge Team,,
+users.csv,general,All,2026-06-30,Knowledge Team,,
+products.csv,general,All,2026-06-30,Knowledge Team,,
+transactions.csv,general,All,2026-06-30,Knowledge Team,,

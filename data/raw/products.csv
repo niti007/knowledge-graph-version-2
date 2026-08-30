@@ -1,0 +1,8 @@
+product_id,name,owner_team,category,price_usd
+PRD-001,Analytics Suite,Product,SaaS,299.0
+PRD-002,DataWarehouse Connector,Data Engineering,Integration,149.0
+PRD-003,SecureVault,Security,Compliance,499.0
+PRD-004,ReportingPortal Pro,Product,SaaS,99.0
+PRD-005,Billing Automation,Billing,SaaS,199.0
+PRD-006,InventoryEngine Lite,Product,SaaS,79.0
+PRD-007,CustomerSuccess Hub,Customer Success,SaaS,349.0

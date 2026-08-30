@@ -1,0 +1,32 @@
+# Neo4j only. Qdrant and Langfuse are cloud services; the semantic cache lives
+# in Qdrant, so no Redis is needed.
+#
+# Host ports are 7475/7688 (not the usual 7474/7687) so this stack can run
+# alongside any other local Neo4j container without a port collision.
+
+services:
+  neo4j:
+    image: neo4j:5.20-community
+    container_name: genai_capstone_neo4j
+    ports:
+      - "7475:7474"   # HTTP / Browser  -> http://localhost:7475
+      - "7688:7687"   # Bolt            -> bolt://localhost:7688
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set in .env}"
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_server_memory_heap_max__size: "1G"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:7474 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
