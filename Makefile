@@ -1,3 +1,6 @@
+PY := .venv/bin/python
+PYTEST := .venv/bin/pytest
+
 .PHONY: help install up down logs check ingest serve ui eval test fmt
 
 help:
@@ -16,19 +19,19 @@ logs:     ## Tail Neo4j logs
 	docker compose logs -f neo4j
 
 check:    ## PHASE 0 GATE: verify every credential works
-	python scripts/check_env.py
+	$(PY) scripts/check_env.py
 
 ingest:   ## Build Qdrant index + Neo4j graph
-	python -m app.ingestion.run
+	$(PY) -m app.ingestion.run
 
 serve:    ## Run FastAPI on :8000
-	uvicorn app.api.main:app --reload --port 8000
+	.venv/bin/uvicorn app.api.main:app --reload --port 8000
 
 ui:       ## Run Streamlit on :8501
-	streamlit run ui/streamlit_app.py
+	.venv/bin/streamlit run ui/streamlit_app.py
 
 test:     ## Run pytest
-	pytest tests/ -v
+	$(PYTEST) tests/ -v
 
 eval:     ## Run the full evaluation suite
-	python -m evals.run_all
+	$(PY) -m evals.run_all
