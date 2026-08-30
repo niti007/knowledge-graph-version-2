@@ -35,8 +35,24 @@ def get_embedder(settings: Settings | None = None):
     if s.embedding_model not in _MODEL_CACHE:
         from sentence_transformers import SentenceTransformer
 
-        _MODEL_CACHE[s.embedding_model] = SentenceTransformer(s.embedding_model)
+        _MODEL_CACHE[s.embedding_model] = SentenceTransformer(
+            s.embedding_model, device=s.torch_device)
     return _MODEL_CACHE[s.embedding_model]
+
+
+def get_reranker(settings: Settings | None = None):
+    """Load (once per process) the BGE cross-encoder used for re-ranking.
+
+    Cached exactly like the bi-encoder: the model is ~1.1s to construct and the
+    ablation harness builds it per query otherwise.
+    """
+    s = settings or get_settings()
+    key = f"cross::{s.reranker_model}"
+    if key not in _MODEL_CACHE:
+        from sentence_transformers import CrossEncoder
+
+        _MODEL_CACHE[key] = CrossEncoder(s.reranker_model, device=s.torch_device)
+    return _MODEL_CACHE[key]
 
 
 def get_max_seq_length(settings: Settings | None = None) -> int:
