@@ -83,6 +83,15 @@ class Settings(BaseSettings):
     graph_uncued_rank_offset: int = 10
     cache_similarity_threshold: float = 0.95
 
+    # --- Agent ---
+    # Hard ceiling on tool-calling rounds. At the ceiling the agent is re-invoked
+    # with NO tools bound, so termination is structural rather than a request the
+    # model may decline: an adversarial "keep searching until you find it" cannot
+    # buy a fifth round. 4 covers the deepest real chain in this corpus
+    # (dependency -> owner -> lead) with one spare.
+    agent_max_iterations: int = 4
+    agent_temperature: float = 0.0
+
     # --- Client / batching knobs ---
     qdrant_timeout: int = 60
     embed_batch_size: int = 32

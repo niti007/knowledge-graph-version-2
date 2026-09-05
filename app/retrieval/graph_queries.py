@@ -245,6 +245,34 @@ class GraphQueries:
         ORDER BY hops, system
     """ % {"max": MAX_CASCADE_DEPTH}
 
+    # ---------------------------------------------------------------- 8
+    SYSTEM_DEPENDENCIES = """
+        MATCH path = (s:System {name: $system})-[:DEPENDS_ON*1..%(max)d]->(dep:System)
+        WHERE length(path) <= $max_depth
+          AND ALL(n IN nodes(path) WHERE size([m IN nodes(path) WHERE m = n]) = 1)
+        RETURN DISTINCT dep.name AS system, min(length(path)) AS hops
+        ORDER BY hops, system
+    """ % {"max": MAX_CASCADE_DEPTH}
+
+    def system_dependencies(self, system: str, max_depth: int = 3) -> list[dict]:
+        """What system X depends ON -- the forward direction.
+
+        This is the inverse of dependency_cascade and exists because its absence
+        was a real correctness hole. Asked "which team owns the system that
+        Payment-Service depends on", the agent reached for dependency_cascade --
+        the closest-named tool -- and got Auth-DB back. That looked correct only
+        because Payment-Service and Auth-DB happen to depend on each other; the
+        true answer is {Auth-DB, Notification-Service}, and Notification-Service
+        was silently dropped. A wrong-direction template that returns a
+        plausible row is invisible to every abstention signal we have, so the
+        fix has to be a template that actually answers the question.
+        """
+        r = resolve_system(system)
+        if not r:
+            return []
+        depth = max(1, min(int(max_depth), MAX_CASCADE_DEPTH))
+        return self._run(self.SYSTEM_DEPENDENCIES, system=r.value, max_depth=depth)
+
     def dependency_cascade(self, system: str, max_depth: int = 3) -> list[dict]:
         """What breaks if system X fails.
 
@@ -347,11 +375,19 @@ class GraphQueries:
         return None
 
 
+# The complete template registry. Every entry here is reachable from the agent
+# (app.agent.tools.GRAPH_TEMPLATES mirrors these names) and every name is
+# asserted to be a real method by
+# tests/test_agent.py::test_template_registry_matches_the_methods_that_exist --
+# this dict silently omitted policies_for_system for a phase, which made the 16
+# 'governs' edges look unreachable to anything reading the registry.
 TEMPLATES = {
     "system_ownership": GraphQueries.system_ownership,
     "team_leadership": GraphQueries.team_leadership,
     "dependency_cascade": GraphQueries.dependency_cascade,
+    "system_dependencies": GraphQueries.system_dependencies,
     "incident_sop": GraphQueries.incident_sop,
     "system_incidents": GraphQueries.system_incidents,
     "team_roster": GraphQueries.team_roster,
+    "policies_for_system": GraphQueries.policies_for_system,
 }

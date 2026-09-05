@@ -72,9 +72,18 @@ def check_openrouter() -> Result:
 
     try:
         with httpx.Client(timeout=TIMEOUT) as c:
-            r = c.get(f"{base}/models", headers={"Authorization": f"Bearer {key}"})
+            # Check an AUTHENTICATED endpoint first. /models is public and
+            # returns 200 for a revoked key or a deleted account, which made a
+            # dead credential look healthy here once already.
+            r = c.get(f"{base}/key", headers={"Authorization": f"Bearer {key}"})
             if r.status_code == 401:
-                return Result("OpenRouter", False, "401 unauthorized - key rejected", fix)
+                return Result(
+                    "OpenRouter", False,
+                    f"401 on /key - {r.json().get('error', {}).get('message', 'rejected')} "
+                    "(revoked key, or a deleted/suspended account)", fix)
+            r.raise_for_status()
+
+            r = c.get(f"{base}/models", headers={"Authorization": f"Bearer {key}"})
             r.raise_for_status()
             available = {m["id"] for m in r.json().get("data", [])}
 
