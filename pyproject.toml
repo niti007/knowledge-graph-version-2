@@ -52,10 +52,11 @@ dependencies = [
   # targets pattern-based identifiers (email, phone, SSN, card), not PERSON,
   # so the large model's better NER buys nothing and costs ~500MB.
   "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
-  # Serving + UI (Phase 6 - pin on install)
-  "fastapi>=0.115",
-  "uvicorn[standard]>=0.30",
-  "streamlit>=1.38",
+  # Serving + UI (Phase 6). Pinned on install, like everything else: the
+  # resolve was verified not to move langchain, langgraph or nemoguardrails.
+  "fastapi==0.141.1",
+  "uvicorn[standard]==0.52.4",
+  "streamlit==1.63.0",
   # Observability (Phase 7 - pin on install)
   "langfuse>=2.50,<3",
 ]
