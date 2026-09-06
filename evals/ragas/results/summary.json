@@ -1,0 +1,198 @@
+{
+  "vector_only": {
+    "n": 30,
+    "elapsed_s": 149.5,
+    "nan_cells": 0,
+    "overall": {
+      "faithfulness": 0.95,
+      "answer_relevancy": 0.9309,
+      "context_precision": 0.8119,
+      "context_recall": 0.8667
+    },
+    "by_category": {
+      "aggregation": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9898,
+        "context_precision": 1.0,
+        "context_recall": 1.0
+      },
+      "factual": {
+        "faithfulness": 0.9444,
+        "answer_relevancy": 0.9712,
+        "context_precision": 0.7634,
+        "context_recall": 0.8889
+      },
+      "incident": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9868,
+        "context_precision": 0.9719,
+        "context_recall": 1.0
+      },
+      "multi_hop": {
+        "faithfulness": 0.9583,
+        "answer_relevancy": 0.9347,
+        "context_precision": 0.3417,
+        "context_recall": 0.5
+      },
+      "policy": {
+        "faithfulness": 0.9286,
+        "answer_relevancy": 0.8029,
+        "context_precision": 0.9413,
+        "context_recall": 0.8571
+      },
+      "sop": {
+        "faithfulness": 0.9333,
+        "answer_relevancy": 0.9782,
+        "context_precision": 0.9286,
+        "context_recall": 1.0
+      }
+    }
+  },
+  "hybrid_no_rerank": {
+    "n": 30,
+    "elapsed_s": 101.3,
+    "nan_cells": 0,
+    "overall": {
+      "faithfulness": 0.95,
+      "answer_relevancy": 0.9347,
+      "context_precision": 0.8405,
+      "context_recall": 0.8389
+    },
+    "by_category": {
+      "aggregation": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9898,
+        "context_precision": 1.0,
+        "context_recall": 1.0
+      },
+      "factual": {
+        "faithfulness": 0.9444,
+        "answer_relevancy": 0.9767,
+        "context_precision": 0.7889,
+        "context_recall": 0.8519
+      },
+      "incident": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.988,
+        "context_precision": 1.0,
+        "context_recall": 1.0
+      },
+      "multi_hop": {
+        "faithfulness": 0.875,
+        "answer_relevancy": 0.9429,
+        "context_precision": 0.4597,
+        "context_recall": 0.375
+      },
+      "policy": {
+        "faithfulness": 0.9286,
+        "answer_relevancy": 0.8067,
+        "context_precision": 0.9405,
+        "context_recall": 0.8571
+      },
+      "sop": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9782,
+        "context_precision": 0.9386,
+        "context_recall": 1.0
+      }
+    }
+  },
+  "hybrid_rerank@bge": {
+    "n": 30,
+    "elapsed_s": 174.1,
+    "nan_cells": 0,
+    "overall": {
+      "faithfulness": 0.9333,
+      "answer_relevancy": 0.9648,
+      "context_precision": 0.9042,
+      "context_recall": 0.9222
+    },
+    "by_category": {
+      "aggregation": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9898,
+        "context_precision": 1.0,
+        "context_recall": 1.0
+      },
+      "factual": {
+        "faithfulness": 0.9444,
+        "answer_relevancy": 0.9774,
+        "context_precision": 0.9148,
+        "context_recall": 0.963
+      },
+      "incident": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.99,
+        "context_precision": 0.876,
+        "context_recall": 1.0
+      },
+      "multi_hop": {
+        "faithfulness": 0.75,
+        "answer_relevancy": 0.9352,
+        "context_precision": 0.6458,
+        "context_recall": 0.5
+      },
+      "policy": {
+        "faithfulness": 0.9286,
+        "answer_relevancy": 0.9377,
+        "context_precision": 0.9722,
+        "context_recall": 1.0
+      },
+      "sop": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9782,
+        "context_precision": 1.0,
+        "context_recall": 1.0
+      }
+    }
+  },
+  "hybrid_rerank@minilm": {
+    "n": 30,
+    "elapsed_s": 243.4,
+    "nan_cells": 0,
+    "overall": {
+      "faithfulness": 0.9667,
+      "answer_relevancy": 0.9649,
+      "context_precision": 0.8363,
+      "context_recall": 0.9222
+    },
+    "by_category": {
+      "aggregation": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9898,
+        "context_precision": 1.0,
+        "context_recall": 1.0
+      },
+      "factual": {
+        "faithfulness": 0.9444,
+        "answer_relevancy": 0.9721,
+        "context_precision": 0.8685,
+        "context_recall": 0.8519
+      },
+      "incident": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9892,
+        "context_precision": 0.9375,
+        "context_recall": 1.0
+      },
+      "multi_hop": {
+        "faithfulness": 0.875,
+        "answer_relevancy": 0.9363,
+        "context_precision": 0.4139,
+        "context_recall": 0.75
+      },
+      "policy": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9498,
+        "context_precision": 0.9167,
+        "context_recall": 1.0
+      },
+      "sop": {
+        "faithfulness": 1.0,
+        "answer_relevancy": 0.9714,
+        "context_precision": 0.89,
+        "context_recall": 1.0
+      }
+    }
+  }
+}

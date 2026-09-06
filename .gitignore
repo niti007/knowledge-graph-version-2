@@ -8,6 +8,7 @@ credentials*.json
 
 # --- Python ---
 .venv/
+.venv-ragas/          # Phase 8: RAGAS pins conflict with the app's langchain range
 venv/
 __pycache__/
 *.py[cod]
@@ -32,6 +33,13 @@ models/
 evals/**/results/
 promptfoo_results.json
 .promptfoo/
+
+# Phase 8 eval artefacts ARE committed: the reports are the deliverable, and a
+# reviewer must be able to see the numbers without re-running a paid eval.
+!evals/promptfoo/results.json
+!evals/ragas/results/
+!evals/ragas/results/*
+evals/ragas/results/*.csv.tmp
 
 # --- OS / editor ---
 .DS_Store
