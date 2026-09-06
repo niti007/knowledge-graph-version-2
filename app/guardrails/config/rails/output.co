@@ -1,0 +1,39 @@
+# Output rails (Colang 1.0).
+#
+# By the time these run, the LangGraph agent has produced a complete answer --
+# non-streaming, so every rail below inspects the whole thing. The evidence they
+# judge against (abstention signals, the provenance ledger) is carried on the
+# run ledger in actions.py rather than re-derived from the answer's prose.
+
+define bot decline ungrounded
+  "I don't have enough support in ACME's knowledge base to answer that reliably, so I'd rather not guess. Retrieval either found nothing relevant or found that no such record exists."
+
+define bot refuse unsafe output
+  "I generated an answer I'm not able to share. Please rephrase the question, or ask a colleague with the appropriate access."
+
+# 1. Policy: is this sayable at all?
+define flow guard output policy
+  $blocked = execute check_output_policy
+  if $blocked
+    bot refuse unsafe output
+    stop
+
+# 2. Grounding. Not a re-rank threshold -- see actions.assess_grounding for why
+#    a cross-encoder score alone tops out at 90% here and cannot see the
+#    near-miss cases at all. The action combines the off-topic score floor with
+#    two structural signals from retrieval.
+define flow guard answer grounding
+  $grounded = execute check_grounding(text=$bot_message)
+  if not $grounded
+    bot decline ungrounded
+    stop
+
+# 3. PII, second pass. The input rail never saw the retrieved context, so this
+#    is the only rail standing between a phone number in an SOP and the user.
+define flow mask pii on output
+  $bot_message = execute mask_pii_output(text=$bot_message)
+
+# 4. Citations. Never blocks -- it demotes. A declined answer must not arrive
+#    wearing citations that imply those documents supported it.
+define flow guard answer citations
+  $ok = execute check_citations(text=$bot_message)

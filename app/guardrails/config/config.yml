@@ -1,0 +1,59 @@
+# NeMo Guardrails configuration for the ACME knowledge assistant.
+#
+# The LLM here is the rails' OWN model -- it judges inputs and outputs and never
+# answers a question. It is the fast tier (LLM_FAST_MODEL) on purpose: rail
+# checks are short classification calls, and paying synthesis-tier prices to ask
+# "is this a jailbreak, yes or no" on every request is how a guardrail becomes
+# the thing someone disables to save money. Answer generation does not happen
+# here at all -- `passthrough: true` hands it to the LangGraph agent through
+# runner.py's generation step, so the rails sit strictly outside the agent.
+#
+# The model id and base_url are injected at load time from app.config, so this
+# file holds no credentials and no environment-specific URL.
+
+models:
+  - type: main
+    engine: openai
+    model: openai/gpt-4o-mini
+    parameters:
+      temperature: 0.0
+
+# Generation is delegated. Without this, NeMo would answer the question itself
+# with the rails LLM -- no retrieval, no citations, no agent.
+passthrough: true
+
+# The rails LLM never streams. An output rail that inspects a grounding claim
+# cannot inspect tokens the user has already read.
+streaming: False
+
+rails:
+  input:
+    flows:
+      # Order matters and is a policy statement.
+      #
+      # PII is masked FIRST, before any other rail and before the question
+      # reaches retrieval. If the jailbreak check ran first, an unmasked SSN
+      # would already have been sent to the rails LLM to be classified -- the
+      # rail meant to protect the data would be the thing that leaks it.
+      - mask pii on input
+      - guard against jailbreak
+      - guard topic scope
+
+  output:
+    flows:
+      # Policy first (is this sayable at all), then grounding (is it true given
+      # what we retrieved), then PII (strip anything the corpus leaked into it),
+      # then citations (does the evidence list still claim to support it).
+      - guard output policy
+      - guard answer grounding
+      - mask pii on output
+      - guard answer citations
+
+  dialog:
+    single_call:
+      enabled: False
+
+# Rails must fail closed on their own errors rather than waving the message
+# through, but we surface the failure as a normal blocked response rather than
+# an exception so runner.py can report which rail failed and why.
+enable_rails_exceptions: False

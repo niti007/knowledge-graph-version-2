@@ -1,0 +1,38 @@
+# Input rails (Colang 1.0).
+#
+# These run before the question reaches the agent, so nothing here may depend on
+# retrieval. Each flow does one thing and its action writes the verdict into the
+# run ledger, so `runner.py` reports WHICH rail fired rather than
+# string-matching the refusal text -- which is exactly what the Phase 9 safety
+# scorecard needs and what a refusal message cannot provide.
+
+define bot refuse jailbreak
+  "I can't help with that request. I answer questions about ACME's internal documentation, policies, incidents and systems -- I can't act on instructions that try to change how I operate."
+
+define bot refuse off topic
+  "That's outside what I can help with. I answer questions grounded in ACME's internal knowledge base: policies, incident reports, SOPs, technical manuals, and the org structure of teams and systems."
+
+# 1. PII first. Deliberately ahead of every other rail: the checks below send
+#    the user's text to the rails LLM, so masking after them would mean the
+#    guardrail itself transmitted the SSN it exists to protect.
+define flow mask pii on input
+  $user_message = execute mask_pii_input(text=$user_message)
+
+# 2. Jailbreak / prompt injection.
+define flow guard against jailbreak
+  $blocked = execute check_jailbreak
+  if $blocked
+    bot refuse jailbreak
+    stop
+
+# 3. Topic scoping. Reuses the same library action with a different prompt
+#    variant, so there is one code path for "ask the rails LLM a yes/no question
+#    about the input" and two prompts, rather than two hand-rolled checks that
+#    can drift apart. The action is our own wrapper around NeMo's -- see
+#    actions._self_check for why calling the library action by its own name
+#    inside a custom flow breaks Colang 1.0.
+define flow guard topic scope
+  $blocked = execute check_topic_scope
+  if $blocked
+    bot refuse off topic
+    stop
