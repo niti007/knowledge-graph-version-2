@@ -57,8 +57,13 @@ dependencies = [
   "fastapi==0.141.1",
   "uvicorn[standard]==0.52.4",
   "streamlit==1.63.0",
-  # Observability (Phase 7 - pin on install)
-  "langfuse>=2.50,<3",
+  # Observability (Phase 7). Pinned EXACTLY, and the range it replaces was
+  # wrong rather than merely loose: `>=2.50,<3` would install the v2 SDK, whose
+  # API this code does not use. langfuse 4 is OpenTelemetry-based --
+  # `start_as_current_observation`, `TraceContext`, `usage_details`/`cost_details`
+  # -- and none of those exist in v2, so a clean install on the old range would
+  # not degrade, it would fail to import. Verified against the full suite.
+  "langfuse==4.15.1",
 ]
 
 [project.optional-dependencies]

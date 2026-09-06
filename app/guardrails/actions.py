@@ -70,6 +70,12 @@ class RunLedger:
     pii_output: list[dict] = field(default_factory=list)
     citation_decision: "CitationDecision | None" = None
     grounding: "GroundingVerdict | None" = None
+    # Phase 7. `cache` is the lookup verdict for this turn (hit or miss and
+    # why); `llm_calls` is NeMo's own per-call token accounting, harvested from
+    # the generation log so the rails tier is costed from the provider's
+    # numbers rather than estimated.
+    cache: dict | None = None
+    llm_calls: list[dict] = field(default_factory=list)
 
     def record(self, decision: RailDecision) -> RailDecision:
         self.decisions.append(decision)

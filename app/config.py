@@ -81,7 +81,33 @@ class Settings(BaseSettings):
     # offset must be >= 1 for the demotion to hold; see
     # tests/test_retrieval.py::test_uncued_graph_fact_cannot_outrank_a_vector_hit
     graph_uncued_rank_offset: int = 10
-    cache_similarity_threshold: float = 0.95
+    # --- Semantic cache (Phase 7) ---
+    cache_enabled: bool = True
+    # 0.97, NOT the 0.95 the plan proposed. Phase 7 measured bge-small on this
+    # corpus's real near-miss pairs and 0.95 conflated two of them outright:
+    # "What depends on DataWarehouse?" vs "What does DataWarehouse depend on?"
+    # scores 0.9558, and "Which systems depend on Auth-DB?" vs "Which systems
+    # does Auth-DB depend on?" scores 0.9929 -- higher than genuine paraphrases.
+    # Raising the threshold alone therefore CANNOT fix argument inversion; the
+    # structural guard in app/llm/cache.py does that, and this number carries
+    # the remaining margin (highest guard-uncaught near-miss measured: 0.9125).
+    # See tests/test_cache.py::TestNearMissSafety.
+    cache_similarity_threshold: float = 0.97
+    # 24h. The corpus is re-ingested by hand, so nothing invalidates an entry
+    # implicitly; the TTL is the only bound on how stale a served answer can be.
+    cache_ttl_seconds: int = 86400
+    # How many ANN candidates the structural guard gets to reject before the
+    # lookup gives up. >1 matters: the nearest neighbour may be an inverted
+    # near-miss while the true paraphrase sits at rank 2.
+    cache_search_limit: int = 5
+
+    # --- Observability (Phase 7) ---
+    langfuse_enabled: bool = True
+    # Seconds the request path will wait on Langfuse before giving up on it.
+    # Tracing is never allowed to be the reason a request fails or hangs.
+    langfuse_timeout: int = 5
+    langfuse_flush_at: int = 20
+    langfuse_flush_interval: float = 1.0
 
     # --- Agent ---
     # Hard ceiling on tool-calling rounds. At the ceiling the agent is re-invoked

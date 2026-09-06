@@ -146,7 +146,22 @@ class Toolbox:
     # --------------------------------------------------------------- tools
     def knowledge_search(self, query: str) -> str:
         """Hybrid vector+graph retrieval. Records provenance, returns context text."""
-        result = self.retriever.retrieve(query, Mode.HYBRID_RERANK)
+        from app.observability.langfuse_client import RETRIEVER, get_tracing
+
+        # A `retriever`-typed span, nested under the tool span the agent opened.
+        # Phase 3's own per-stage timings are attached as metadata rather than
+        # re-measured, so the trace and the ablation harness report the same
+        # numbers instead of two slightly different ones.
+        with get_tracing().span("retrieval.hybrid_rerank", as_type=RETRIEVER,
+                                input=query) as sp:
+            result = self.retriever.retrieve(query, Mode.HYBRID_RERANK)
+            sp.update(output={"n_items": len(result.items),
+                              "citations": [i.citation for i in result.items][:10]},
+                      metadata={"mode": Mode.HYBRID_RERANK.value
+                                if hasattr(Mode.HYBRID_RERANK, "value")
+                                else str(Mode.HYBRID_RERANK),
+                                "timings_ms": result.timings_ms,
+                                "resolved_entities": result.resolved_entities})
         self.records.extend(result.items)
         self.abstention.append({
             "tool": "knowledge_search", "query": query,

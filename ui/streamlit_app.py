@@ -115,9 +115,11 @@ def render_footer(data: dict) -> None:
     if trace_url:
         st.markdown(f"[Open trace in Langfuse]({trace_url})")
     elif trace_id:
-        # The slot is wired; Phase 7 fills trace_url in when Langfuse is on.
-        st.caption(f"Trace `{trace_id}` — Langfuse link appears here once "
-                   "tracing is enabled (Phase 7).")
+        # No link means tracing is off or Langfuse was unreachable. The id is
+        # still shown, because it is the same id the trace carries once the
+        # link comes back -- searchable by hand in the Langfuse UI.
+        st.caption(f"Trace `{trace_id}` — no Langfuse link (tracing disabled "
+                   "or unreachable).")
 
 
 # ----------------------------------------------------------------- layout

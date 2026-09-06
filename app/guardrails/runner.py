@@ -50,6 +50,7 @@ registry -- so construction is serialised under a lock.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import threading
 import time
@@ -58,6 +59,11 @@ from pathlib import Path
 from typing import Any, Callable
 
 from app.config import Settings, get_settings
+from app.observability.langfuse_client import (
+    GENERATION,
+    GUARDRAIL,
+    get_tracing,
+)
 from app.guardrails.actions import (
     PiiScanner,
     current_ledger,
@@ -106,6 +112,14 @@ class GuardrailedResponse:
     latency_ms: float = 0.0
     agent_latency_ms: float = 0.0
     error: str | None = None
+    # Phase 7. `cached` is the honest answer to "did a model run for this
+    # turn"; `cache` carries the reason either way, including which candidate
+    # the structural guard refused.
+    cached: bool = False
+    cache: dict | None = None
+    # Per-call token accounting for the rails tier, straight from NeMo's
+    # generation log. This is the evidence behind the tiering table.
+    llm_calls: list[dict] = field(default_factory=list)
 
     @property
     def fired(self) -> list[str]:
@@ -140,12 +154,22 @@ class Guardrails:
     def __init__(self, settings: Settings | None = None,
                  config_path: Path | str = CONFIG_PATH,
                  agent_fn: Callable[..., Any] | None = None,
-                 scanner: PiiScanner | None = None):
+                 scanner: PiiScanner | None = None,
+                 cache: Any = None,
+                 tracing: Any = None):
         self.settings = settings or get_settings()
         self.config_path = Path(config_path)
         # Injection seam: tests pass a stub so the suite never calls the agent.
         self._agent_fn = agent_fn
         self._scanner = scanner or PiiScanner()
+        # Injected, exactly like `agent_fn`, and absent by default. Defaulting
+        # to the process-wide cache would mean every directly-constructed
+        # Guardrails -- including the ~40 in the test suite -- reached for a
+        # Qdrant connection on its first question. `get_guardrails()` wires the
+        # real one in for the service; anything that wants caching asks for it.
+        self._cache = cache
+        self._tracing = tracing
+        self._supports_options: bool | None = None
         self._rails = None
         # Serialises LLMRails construction: NeMo registers its framework in a
         # process-global registry and a concurrent second build raises.
@@ -155,6 +179,19 @@ class Guardrails:
         self._loop_lock = threading.Lock()
 
     # ------------------------------------------------------------ wiring
+    @property
+    def cache(self):
+        """The injected semantic cache, or None. Never constructs one."""
+        if not self._cache or not getattr(self._cache, "enabled", False):
+            return None
+        return self._cache
+
+    @property
+    def tracing(self):
+        if self._tracing is None:
+            self._tracing = get_tracing(self.settings)
+        return self._tracing
+
     def _agent(self, question: str):
         """Blocking. Always reached through asyncio.to_thread -- see _generate."""
         if self._agent_fn is not None:
@@ -250,6 +287,41 @@ class Guardrails:
         question = (context or {}).get("user_message") or ledger.question
         ledger.masked_question = question
         t0 = time.perf_counter()
+
+        # --- semantic cache -------------------------------------------------
+        #
+        # THIS is why the lookup lives here and not in the API handler. Reaching
+        # this function at all means the input rails passed: a jailbreak, an
+        # off-topic question or an injection was blocked upstream and never gets
+        # to consult the cache. A cached answer therefore cannot be served to a
+        # request whose input rails should have fired -- not because a check
+        # remembers to look, but because the code is unreachable from there.
+        #
+        # The key is `question`, which at this point is the PII-MASKED text --
+        # exactly what the agent is about to be given. No raw PII is written to
+        # the cache, and two questions that share a key would have produced the
+        # same answer anyway.
+        cache = self.cache
+        if cache is not None:
+            with self.tracing.span("cache.lookup", input=question) as sp:
+                lookup = await asyncio.to_thread(cache.lookup, question)
+                sp.update(output=lookup.to_dict(),
+                          metadata={"threshold": cache.threshold,
+                                    "candidates": lookup.candidates})
+            ledger.cache = lookup.to_dict()
+            if lookup.hit:
+                # The ORIGINAL run's citations, provenance and abstention
+                # evidence go back into the ledger, so check_grounding and
+                # check_citations evaluate the same evidence they saw on the
+                # miss and reach the same verdict. A hit is not a citation-free
+                # answer, and it is not an unchecked one either.
+                cached = lookup.as_agent_response()
+                ledger.agent_response = cached
+                ledger.agent_latency_ms = 0.0
+                return cached.answer, {
+                    "tools_used": list(cached.tools_used),
+                    "n_citations": len(cached.citations), "cached": True}
+
         # to_thread, not a direct call: run_agent blocks on Qdrant, Neo4j and
         # two LLM round-trips, and blocking this loop would serialise every
         # other in-flight request behind it. to_thread copies the current
@@ -290,9 +362,19 @@ class Guardrails:
         error = None
         text = ""
         try:
-            result = await self.rails.generate_async(
-                messages=[{"role": "user", "content": question}])
-            text = result.get("content", "") if isinstance(result, dict) else str(result)
+            with self.tracing.span("guardrails", as_type=GUARDRAIL,
+                                   input=question) as sp:
+                result = await self._generate_with_log(question, ledger)
+                text = self._extract_text(result)
+                sp.update(output={"answer": text[:2000],
+                                  "blocked_by": ledger.blocked_by,
+                                  "fired": ledger.fired},
+                          metadata={"rails": [d.to_dict() for d in ledger.decisions],
+                                    "cache": ledger.cache,
+                                    "llm_calls": ledger.llm_calls})
+                # Inside the `with`, so the per-rail observations nest under
+                # `guardrails` rather than hanging off the request root.
+                self._trace_rail_decisions(ledger)
         except Exception as exc:  # noqa: BLE001 - a rail failure must not 500
             log.exception("guardrails run failed")
             error = f"{type(exc).__name__}: {exc}"
@@ -300,8 +382,149 @@ class Guardrails:
         finally:
             reset_ledger(token)
 
-        return self._assemble(question, text, ledger, error,
-                              (time.perf_counter() - t0) * 1000)
+        response = self._assemble(question, text, ledger, error,
+                                  (time.perf_counter() - t0) * 1000)
+        await self._maybe_store(response, ledger)
+        return response
+
+    async def _generate_with_log(self, question: str, ledger: RunLedger):
+        """Call the rails, asking NeMo for its per-LLM-call accounting.
+
+        The option is passed only when the installed `generate_async` actually
+        accepts it -- the test suite drives this class with stub rails objects
+        whose signature is `(messages)`, and a TypeError there would be caught
+        by the caller's except and reported to a user as a rails failure.
+        """
+        rails = self.rails
+        if self._supports_options is None:
+            try:
+                self._supports_options = "options" in inspect.signature(
+                    rails.generate_async).parameters
+            except (TypeError, ValueError):  # pragma: no cover - exotic callables
+                self._supports_options = False
+
+        messages = [{"role": "user", "content": question}]
+        if not self._supports_options:
+            return await rails.generate_async(messages=messages)
+
+        from nemoguardrails.rails.llm.options import (
+            GenerationLogOptions,
+            GenerationOptions,
+        )
+
+        result = await rails.generate_async(
+            messages=messages,
+            options=GenerationOptions(log=GenerationLogOptions(llm_calls=True)))
+        ledger.llm_calls = self._llm_calls_from(result)
+        return result
+
+    @staticmethod
+    def _llm_calls_from(result: Any) -> list[dict]:
+        """Flatten NeMo's LLMCallInfo records into plain dicts.
+
+        `task` is the rail that made the call (`self_check_input`,
+        `self_check_output`, ...), which is what turns this from a token total
+        into per-task evidence that the fast tier is doing the internal work.
+        """
+        log_obj = getattr(result, "log", None)
+        calls = getattr(log_obj, "llm_calls", None) or []
+        out = []
+        for c in calls:
+            out.append({
+                "task": getattr(c, "task", None),
+                "model": getattr(c, "llm_model_name", None),
+                "prompt_tokens": getattr(c, "prompt_tokens", None),
+                "completion_tokens": getattr(c, "completion_tokens", None),
+                "total_tokens": getattr(c, "total_tokens", None),
+                "duration_ms": round((getattr(c, "duration", 0.0) or 0.0) * 1000, 2),
+            })
+        return out
+
+    @staticmethod
+    def _extract_text(result: Any) -> str:
+        """One answer string out of any shape `generate_async` returns.
+
+        With `options` NeMo returns a GenerationResponse whose `.response` is a
+        list of messages; without it, a bare dict. Both shapes reach here, plus
+        whatever a test stub hands back.
+        """
+        if isinstance(result, dict):
+            return result.get("content", "") or ""
+        payload = getattr(result, "response", None)
+        if isinstance(payload, list) and payload:
+            last = payload[-1]
+            if isinstance(last, dict):
+                return last.get("content", "") or ""
+            return str(last)
+        if isinstance(payload, dict):
+            return payload.get("content", "") or ""
+        if isinstance(payload, str):
+            return payload
+        return str(result)
+
+    def _trace_rail_decisions(self, ledger: RunLedger) -> None:
+        """Emit one Langfuse observation per rail decision, and per rails LLM call.
+
+        These are created after the run rather than around each rail, because
+        the rails execute inside NeMo's Colang interpreter and there is no seam
+        to wrap. Their real durations come off the ledger and NeMo's log and are
+        carried as metadata; the span's own wall-clock is not meaningful and is
+        not presented as if it were.
+        """
+        tracing = self.tracing
+        if not getattr(tracing, "enabled", False):
+            return
+        try:
+            for d in ledger.decisions:
+                dd = d.to_dict()
+                with tracing.span(f"rail.{dd['rail']}", as_type=GUARDRAIL,
+                                  metadata=dd) as sp:
+                    sp.update(output={"triggered": dd.get("triggered"),
+                                      "blocking": dd.get("blocking"),
+                                      "reason": dd.get("reason")})
+            for call in ledger.llm_calls:
+                with tracing.generation(
+                        f"llm.rails.{call.get('task') or 'unknown'}",
+                        model=call.get("model"), metadata=call) as sp:
+                    tracing.record_generation(
+                        sp, model=call.get("model"),
+                        prompt_tokens=call.get("prompt_tokens"),
+                        completion_tokens=call.get("completion_tokens"),
+                        task=call.get("task"), tier="fast",
+                        extra={"duration_ms": call.get("duration_ms")})
+        except Exception:  # noqa: BLE001 - tracing never breaks a request
+            log.debug("rail decision tracing failed", exc_info=True)
+
+    async def _maybe_store(self, response: "GuardrailedResponse",
+                           ledger: RunLedger) -> None:
+        """Cache this turn, if it is a turn that may be cached at all.
+
+        Four gates, and `SemanticCache.store` re-checks the first two itself so
+        the invariant does not depend on this caller getting it right:
+        nothing blocked, nothing errored, an agent actually ran, and the answer
+        did not come from the cache in the first place.
+        """
+        cache = self.cache
+        if cache is None or response.cached or response.blocked or response.error:
+            return
+        agent = ledger.agent_response
+        if agent is None or not (response.answer or "").strip():
+            return
+        try:
+            await asyncio.to_thread(
+                cache.store,
+                ledger.masked_question or response.question,
+                answer=response.answer,
+                citations=response.citations,
+                provenance=response.provenance,
+                retrieved=list(getattr(agent, "retrieved", []) or []),
+                tools_used=response.tools_used,
+                abstention=dict(getattr(agent, "abstention", {}) or {}),
+                grounding=response.grounding,
+                blocked=response.blocked,
+                error=response.error)
+        except Exception:  # noqa: BLE001 - store already swallows; belt and braces
+            log.debug("cache store raised through", exc_info=True)
 
     def run(self, question: str) -> GuardrailedResponse:
         """Synchronous entry point. Safe to call from many threads at once.
@@ -365,6 +588,9 @@ class Guardrails:
             latency_ms=latency_ms,
             agent_latency_ms=getattr(ledger, "agent_latency_ms", 0.0) or 0.0,
             error=error,
+            cached=bool((ledger.cache or {}).get("hit")),
+            cache=ledger.cache,
+            llm_calls=list(ledger.llm_calls or []),
         )
 
 
@@ -389,7 +615,13 @@ def get_guardrails(settings: Settings | None = None) -> Guardrails:
     # process-global framework registry raises on the second.
     with _DEFAULT_LOCK:
         if _DEFAULT is None:
-            _DEFAULT = Guardrails(settings=settings)
+            cache = None
+            s = settings or get_settings()
+            if s.cache_enabled:
+                from app.llm.cache import get_cache
+
+                cache = get_cache(s)
+            _DEFAULT = Guardrails(settings=settings, cache=cache)
     return _DEFAULT
 
 

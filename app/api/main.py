@@ -60,6 +60,7 @@ from app.api.sessions import (
     SessionStore,
 )
 from app.config import Settings, get_settings
+from app.observability.langfuse_client import get_tracing
 
 log = logging.getLogger(__name__)
 
@@ -133,6 +134,7 @@ class AppState:
     metrics: Metrics
     probes: list[Probe]
     guardrails: object | None = None
+    tracing: object | None = None
     started_at: float = field(default_factory=time.time)
     warmup_complete: bool = False
     warmup_seconds: float | None = None
@@ -157,7 +159,8 @@ def create_app(*, settings: Settings | None = None,
                guardrails: object | None = None,
                probes: list[Probe] | None = None,
                warm: bool = True,
-               store: SessionStore | None = None) -> FastAPI:
+               store: SessionStore | None = None,
+               tracing: object | None = None) -> FastAPI:
     """Build the ASGI app.
 
     A factory, not a module-level singleton with monkeypatched globals: the test
@@ -175,6 +178,9 @@ def create_app(*, settings: Settings | None = None,
         metrics=Metrics(),
         probes=probes if probes is not None else default_probes(s),
         guardrails=guardrails,
+        # Injected so a test can pass a disabled tracer and be certain the
+        # suite makes no Langfuse call, rather than relying on absent creds.
+        tracing=tracing if tracing is not None else get_tracing(s),
     )
 
     @asynccontextmanager
@@ -186,6 +192,15 @@ def create_app(*, settings: Settings | None = None,
             state.warmup_complete = True
             state.warmup_seconds = 0.0
         yield
+        # Langfuse batches; without this the last few requests before a restart
+        # never reach the UI, and a short-lived container traces nothing at all.
+        t = state.tracing
+        if t is not None:
+            try:
+                t.flush()
+                t.shutdown()
+            except Exception:  # noqa: BLE001
+                log.warning("langfuse shutdown failed", exc_info=True)
         # The rails own a background event-loop thread for sync callers; close
         # it so a reload does not leak one per restart.
         g = state.guardrails
@@ -222,6 +237,23 @@ async def _warmup(state: AppState) -> None:
             get_embedder(state.settings)          # bi-encoder, ~2s
             get_reranker(state.settings)          # cross-encoder, ~14s cold
             rails.warmup()                        # Colang + flows + spaCy, ~7-9s
+            # Both of these do one network round-trip the FIRST time only.
+            # Paid here, off the loop, they cost a user nothing; paid lazily,
+            # the first request wears them. Neither may fail the warmup: a
+            # missing trace link or a cold cache is a degraded system, not a
+            # broken one, and `/health` already reports the dependencies that
+            # genuinely make it unable to answer.
+            try:
+                if state.tracing is not None:
+                    state.tracing.resolve_trace_url_template()
+            except Exception:  # noqa: BLE001
+                log.warning("langfuse trace url unresolved", exc_info=True)
+            try:
+                cache = getattr(rails, "cache", None)
+                if cache is not None:
+                    cache.ensure_collection()
+            except Exception:  # noqa: BLE001
+                log.warning("semantic cache unavailable", exc_info=True)
 
         await asyncio.to_thread(_load)
         state.warmup_complete = True
@@ -259,21 +291,43 @@ def _register_routes(app: FastAPI) -> None:
         question = req.question.strip()
 
         meta = system_card.classify(question)
-        if meta is not None:
-            # Answered before retrieval and before the rails. See system_card.
-            response = ChatResponse(
-                answer=system_card.answer(question),
-                trace_id=trace_id, session_id=session_id, route="system_card",
-                latency_ms=round((time.perf_counter() - t0) * 1000, 2),
-            )
-        else:
-            # arun, NOT run: see the module docstring. This is the only call
-            # into the guardrails layer in the whole service.
-            rails = await state.rails()
-            guarded = await rails.arun(question)
-            response = _to_response(guarded, trace_id=trace_id,
-                                    session_id=session_id, state=state)
-            response.latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+        # The root of the Langfuse trace, opened with OUR trace_id so the id in
+        # the response, the id in the session transcript and the id in the
+        # Langfuse UI are one string. The context manager is entered for both
+        # branches, including the system-card one, because "this request never
+        # reached a model" is itself worth being able to see in the trace.
+        with state.tracing.trace(
+                "chat", trace_id=trace_id, input=question,
+                metadata={"session_id": session_id,
+                          "route": "system_card" if meta else "guardrails"},
+        ) as root:
+            if meta is not None:
+                # Answered before retrieval, before the rails, and before the
+                # cache -- it is already ~0.1ms, and caching a constant string
+                # would add a network round-trip to make it slower.
+                response = ChatResponse(
+                    answer=system_card.answer(question),
+                    trace_id=trace_id, session_id=session_id, route="system_card",
+                    trace_url=state.tracing.trace_url(trace_id),
+                    latency_ms=round((time.perf_counter() - t0) * 1000, 2),
+                )
+            else:
+                # arun, NOT run: see the module docstring. This is the only call
+                # into the guardrails layer in the whole service.
+                rails = await state.rails()
+                guarded = await rails.arun(question)
+                response = _to_response(guarded, trace_id=trace_id,
+                                        session_id=session_id, state=state)
+                response.latency_ms = round((time.perf_counter() - t0) * 1000, 2)
+            root.update(
+                output={"answer": response.answer[:2000],
+                        "blocked": response.blocked,
+                        "n_citations": len(response.citations)},
+                metadata={"cached": response.cached, "route": response.route,
+                          "blocked_by": response.blocked_by,
+                          "rails_fired": response.rails_fired,
+                          "tools_used": response.tools_used,
+                          "latency_ms": response.latency_ms})
 
         state.metrics.record_chat(
             route=response.route, latency_ms=response.latency_ms,
@@ -366,10 +420,14 @@ def _to_response(guarded, *, trace_id: str, session_id: str,
         provenance=d.get("provenance") or [],
         tools_used=d.get("tools_used") or [],
         trace_id=trace_id,
-        trace_url=None,          # Phase 7
+        # None until warmup resolved the project id, and None forever if
+        # Langfuse is unreachable. The UI treats an absent link as "no trace",
+        # which is the truth in both cases.
+        trace_url=state.tracing.trace_url(trace_id) if state.tracing else None,
         session_id=session_id,
         latency_ms=round(d.get("latency_ms") or 0.0, 2),
-        cached=False,            # Phase 7 owns the semantic cache
+        # Reported, not assumed: the rails ledger says whether a model ran.
+        cached=bool(d.get("cached")),
         blocked=bool(d.get("blocked")),
         blocked_by=d.get("blocked_by"),
         blocked_stage=d.get("blocked_stage"),
