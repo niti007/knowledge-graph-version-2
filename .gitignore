@@ -45,3 +45,8 @@ evals/ragas/results/*.csv.tmp
 .DS_Store
 .idea/
 .vscode/
+# Phase 9: load-test summaries are committed for the same reason. The
+# per-second stats_history CSVs and server logs are regenerable noise.
+!evals/load/results/
+evals/load/results/*_stats_history.csv
+evals/load/results/*.server.log
