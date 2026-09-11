@@ -149,6 +149,13 @@ def summarize_abstention(signals: list[dict]) -> dict:
         "negative_facts": negatives,
         "entity_resolved_but_graph_empty": any(
             s.get("entity_resolved_but_graph_empty") for s in signals),
+        # WHICH entities came back empty, so the grounding rail can ask the
+        # only question that matters: does the answer assert something about
+        # one of them? An exploratory lookup the answer never uses is not an
+        # unsupported claim.
+        "empty_entities": sorted({
+            str(s.get("resolved_entity")) for s in signals
+            if s.get("entity_resolved_but_graph_empty") and s.get("resolved_entity")}),
         "entity_unresolved": any(s.get("entity_unresolved") for s in signals),
         "graph_declined": any(s.get("graph_declined") for s in signals),
         "max_rerank_score": max(scores) if scores else None,

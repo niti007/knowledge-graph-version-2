@@ -513,9 +513,31 @@ def assess_grounding(abstention: dict | None, answer: str,
                        else "answer_acknowledges_absence")
 
     if signals["entity_resolved_but_graph_empty"]:
-        return verdict(False, "entity_resolved_but_graph_empty")
+        # The agent explores: asked "who owns the system Payment-Service depends
+        # on", gpt-4o fans system_ownership out to EVERY dependency, including
+        # Notification-Service, which has no owner in the corpus. That empty
+        # lookup set this flag even though the final answer only ever spoke
+        # about Auth-DB -- and the multi-hop demo was blocked on first ask,
+        # twice, during deployment validation. An empty lookup is only an
+        # unsupported claim if the answer asserts something about that entity.
+        empties = abstention.get("empty_entities") or []
+        mentioned = [e for e in empties if e and e.lower() in answer.lower()]
+        if mentioned or not empties:
+            # Either the answer talks about an entity the graph has nothing on
+            # (block: that is exactly the near-miss confabulation), or we have
+            # the flag with no entity list (older callers): keep the strict path.
+            return verdict(False, "entity_resolved_but_graph_empty")
+        signals["empty_entities_unmentioned"] = empties
 
-    if signals["negative_facts"]:
+    # A graph negative ("X returned no rows") about an entity the answer never
+    # mentions is the same exploratory lookup seen from the other side. Only a
+    # negative about something the answer DOES speak to can contradict it. The
+    # confabulation case -- the answer asserting about X while the graph holds
+    # nothing on X -- is still caught above, because X is then mentioned.
+    unmentioned = set(signals.get("empty_entities_unmentioned") or [])
+    live_negatives = [n for n in signals["negative_facts"]
+                      if not any(e.lower() in n.lower() for e in unmentioned)]
+    if live_negatives:
         return verdict(False, "negative_facts_present")
 
     if signals["no_results_returned"]:

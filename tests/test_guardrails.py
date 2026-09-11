@@ -1107,3 +1107,59 @@ def test_arun_is_the_documented_entry_point_for_a_running_loop():
 
     message = asyncio.run(main())
     assert "arun" in message, f"the error must point at arun(); got {message!r}"
+
+
+class TestExploratoryEmptyLookupsDoNotBlockUnrelatedAnswers:
+    """Asked "who owns the system Payment-Service depends on", gpt-4o fans
+    system_ownership out to EVERY dependency, including Notification-Service,
+    which has no owner in the corpus. That empty lookup blocked the multi-hop
+    demo on first ask, twice, during deployment validation -- even though the
+    answer only ever spoke about Auth-DB.
+
+    The rail is now scoped: an empty lookup is an unsupported claim only if the
+    answer asserts something about THAT entity. The three tests below pin both
+    halves of that -- the false positive is gone AND the confabulation it was
+    guarding against is still caught."""
+
+    EXPLORED = grounded_abstention(
+        max_rerank_score=0.71,
+        entity_resolved_but_graph_empty=True,
+        empty_entities=["Notification-Service"],
+        negative_facts=["system_ownership(Notification-Service) returned no rows"],
+    )
+
+    def test_answer_about_a_different_entity_is_grounded(self):
+        v = assess_grounding(
+            self.EXPLORED,
+            "Payment-Service depends on Auth-DB, which is owned by the "
+            "Infrastructure team, led by Marcus Lee.")
+        assert v.grounded is True, v.reason
+
+    def test_answer_that_asserts_about_the_empty_entity_is_still_blocked(self):
+        """The protection this rail exists for. Mutation guard: removing the
+        `mentioned` check would let this through."""
+        v = assess_grounding(
+            self.EXPLORED,
+            "Notification-Service is owned by the Billing team.")
+        assert v.grounded is False
+        assert v.reason == "entity_resolved_but_graph_empty"
+
+    def test_flag_without_an_entity_list_keeps_the_strict_path(self):
+        """Older callers that set the flag but not empty_entities must not be
+        silently loosened."""
+        v = assess_grounding(
+            grounded_abstention(entity_resolved_but_graph_empty=True),
+            "Payment-Service depends on Auth-DB.")
+        assert v.grounded is False
+        assert v.reason == "entity_resolved_but_graph_empty"
+
+    def test_negative_about_a_mentioned_entity_still_blocks(self):
+        """A negative fact about something the answer DOES speak to must
+        contradict it, unchanged from before."""
+        v = assess_grounding(
+            grounded_abstention(
+                entity_resolved_but_graph_empty=True,
+                empty_entities=["INC-206"],
+                negative_facts=["incident_root_cause(INC-206) returned no rows"]),
+            "The root cause of INC-206 was a certificate expiry.")
+        assert v.grounded is False
