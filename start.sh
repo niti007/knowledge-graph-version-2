@@ -27,6 +27,20 @@ UI_PORT=${PORT:-7860}
 export API_URL=${API_URL:-http://127.0.0.1:${API_PORT}}
 
 cd /app
+
+# This container OWNS its Neo4j. An external NEO4J_URI in the environment is
+# never right here -- and it happened: a leftover Aura secret on the reused
+# Space overrode the Dockerfile ENV, the embedded instance came up fine on
+# localhost, and boot spent 120s waiting on a hostname it should never have
+# looked at. Force the embedded endpoint and say so loudly if we overrode.
+EMBEDDED_URI="bolt://127.0.0.1:7687"
+if [ -n "${NEO4J_URI:-}" ] && [ "${NEO4J_URI}" != "${EMBEDDED_URI}" ]; then
+  log "WARNING: ignoring external NEO4J_URI=${NEO4J_URI}; this image runs its own Neo4j"
+fi
+export NEO4J_URI="${EMBEDDED_URI}"
+export NEO4J_USER="${NEO4J_USER:-neo4j}"
+export NEO4J_PASSWORD="${NEO4J_PASSWORD:-embedded-no-auth}"
+
 log "boot as uid=$(id -u) gid=$(id -g)  NEO4J_URI=${NEO4J_URI}  TORCH_DEVICE=${TORCH_DEVICE:-auto}"
 
 # Refuse to start without the cloud credentials the app cannot run without.

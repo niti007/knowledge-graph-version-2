@@ -6,7 +6,7 @@ colorTo: blue
 sdk: docker
 app_port: 7860
 pinned: false
-short_description: Hybrid vector + graph RAG over an enterprise corpus, with guardrails
+short_description: Hybrid vector+graph RAG with guardrails over enterprise docs
 ---
 
 # Enterprise Knowledge Assistant
